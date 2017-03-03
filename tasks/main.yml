@@ -1,0 +1,90 @@
+# Enables or disables a given repository and optionally synchronizes it.
+#
+# REQUIRED VARIABLES
+#   state             -
+#   synchronize       -
+#   synchronize_async -
+#   organization      -
+#   product           -
+#   repository        -
+#   basearch          -
+#
+# OPTIONAL VARIABLES
+#   release -
+#
+# SETS FACTS
+#   satellite_repository_syncronization_tasks -
+
+- name: Verify 'organization' defined
+  fail:
+    msg: "'organization' must be defined"
+  when: organization is undefined
+
+- name: Verify 'product' defined
+  fail:
+    msg: "'product' must be defined"
+  when: product is undefined
+
+- name: Verify 'repository' defined
+  fail:
+    msg: "'repository' must be defined"
+  when: repository is undefined
+
+- name: Verify 'basearch' defined
+  fail:
+    msg: "'basearch' must be defined"
+  when: basearch is undefined
+
+- name: Set repository_full_name
+  set_fact:
+    repository_full_name: "{{ repository }} RPMs {{ basearch }}{{ release | default('') | regex_replace('^([^\\s]+)$', ' \\1') }}"
+
+- name: Verify if Repository '{{ repository }}' is enabled
+  command: >
+    hammer repository info \
+      --organization {{ org }} \
+      --product "{{ product }}" \
+      --name "{{ repository_full_name }}"
+  ignore_errors: True
+  changed_when: False
+  register: repository_info_results
+
+- name: Set releasever_flag
+  set_fact:
+    releasever_flag: --releasever {{ release }}
+  when: release is defined
+
+- name: "{{ state }} Repository '{{ repository }}'"
+  command: >
+    hammer repository-set {{ state }} \
+      --organization {{ org }} \
+      --product "{{ product }}" \
+      --basearch "{{ basearch }}" \
+      --name "{{ repository }} (RPMs)" \
+      {{ releasever_flag | default('') }}
+  when: (repository_info_results.rc != 0 and state == "enable") or (repository_info_results.rc == 0 and state == "disable")
+
+- block:
+    - name: Set async_flag
+      set_fact:
+        async_flag: "--async"
+      when: synchronize_async
+
+    - name: Synchronize Repository '{{ repository }}'
+      command: >
+        hammer --output json repository synchronize \
+          --organization {{ org }} \
+          --product "{{ product }}" \
+          --name "{{ repository_full_name }}" \
+          {{ async_flag | default('') }}
+      register: synchronize_result
+
+    - name: Create synchronize_result_json from synchronize_result json
+      set_fact:
+        synchronize_result_json: "{{ synchronize_result.stdout | from_json }}"
+
+    - name: Update list of satellite_repository_syncronization_tasks
+      set_fact:
+        satellite_repository_syncronization_tasks: "{{ satellite_repository_syncronization_tasks | default([]) }} + {{ [synchronize_result_json.id] }}"
+  when: synchronize
+

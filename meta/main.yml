@@ -1,0 +1,24 @@
+galaxy_info:
+  author: Ian Tewksbury
+  description: Ansible role for enabling, disabling, and synchronizing repositories with Satellite 6 using hammer.
+  company: Red Hat
+  license: license (Apache)
+  min_ansible_version: 2.2.0
+  platforms:
+  - name: EL
+    versions:
+    - 6
+    - 7
+  galaxy_tags:
+    - satellite
+    - satellite6
+    - hammer
+    - tools
+    - redhat
+  categories:
+    - satellite
+    - satellite6
+    - hammer
+    - tools
+    - redhat
+dependencies: []
